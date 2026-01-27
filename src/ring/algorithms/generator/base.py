@@ -1,8 +1,10 @@
 from dataclasses import replace
 from functools import partial
+import inspect
 import json
 import logging
 import random
+from types import FunctionType
 from typing import Callable, Optional
 import warnings
 
@@ -144,6 +146,9 @@ class RCMG:
         to_json_kwargs.pop("self")
         to_json_kwargs.pop("sys")
         to_json_kwargs.pop("config")
+        # don't serialise the `sys_ml`; i will probably remove the arg in the first
+        # place and simply always use sys_ml = sys[0]
+        to_json_kwargs.pop("sys_ml")
 
         # add some default values
         randomize_hz_kwargs_defaults = dict(add_dt=True)
@@ -372,8 +377,13 @@ class RCMG:
     def serialise_to_dict(self) -> dict:
         dict_representation = {
             "system": [_sys.to_str(warn=False) for _sys in self._to_json_sys],
-            "motion_configs": [_config.__dict__ for _config in self._to_json_mconfig],
-            "kwargs": self._to_json_kwargs,
+            "motion_configs": [
+                _config.serialise_to_dict() for _config in self._to_json_mconfig
+            ],
+            "kwargs": {
+                k: inspect.getsource(v) if isinstance(v, FunctionType) else v
+                for k, v in self._to_json_kwargs.items()
+            },
         }
         return dict_representation
 

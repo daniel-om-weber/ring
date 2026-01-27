@@ -3,10 +3,13 @@ from dataclasses import asdict
 from dataclasses import dataclass
 from dataclasses import field
 from dataclasses import replace
+import inspect
+from types import FunctionType
 from typing import Any, Callable, get_type_hints, Optional
 
 import jax
 import jax.numpy as jnp
+import tree
 import tree_utils
 
 from ring import algebra
@@ -285,6 +288,24 @@ class MotionConfig:
     @staticmethod
     def from_register(name: str) -> "MotionConfig":
         return _registered_motion_configs[name]
+
+    def serialise_to_dict(self) -> dict:
+        import numpy as np
+
+        def leaf_operation(value):
+            if isinstance(value, jax.Array):
+                value = np.asarray(value)
+
+            if isinstance(value, np.ndarray):
+                value = value.tolist()
+                return value
+
+            if isinstance(value, FunctionType):
+                value = inspect.getsource(value)
+                return value
+
+        # TODO this .copy() is probably not needed
+        return tree.map_structure(leaf_operation, self.__dict__.copy())
 
 
 _overwrite_for_joint_type_changes: dict[str, dict] = defaultdict(lambda: dict())
